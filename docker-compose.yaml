@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+
+  backend:
+    build: ./spring-backend
+    container_name: backend
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:${MYSQL_PORT}/${MYSQL_DATABASE}?allowPublicKeyRetrieval=true&useSSL=false
+    volumes:
+      - ./spring-backend/config:/app/config:ro
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./react-frontend
+      args:
+        REACT_APP_API_BASE_URL: "${REACT_APP_API_BASE_URL}"
+    container_name: frontend
+    env_file:
+      - ./react-frontend/.env
+
+  nginx-proxy:
+    build: .
+    container_name: nginx_proxy
+    restart: always
+    env_file:
+      - .env
+      - ./react-frontend/.env
+    environment:
+      BACKEND_UPSTREAM: "http://backend:${SPRING_PORT}"
+      FRONTEND_UPSTREAM: "http://frontend:${FRONTEND_PORT}"
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/log:/var/log/nginx
+    depends_on:
+      - backend
+      - frontend
+
+
+  db:
+    image: mysql:8.0
+    container_name: db
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./volumes/db:/var/lib/mysql
